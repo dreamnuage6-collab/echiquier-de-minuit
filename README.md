@@ -4,7 +4,9 @@ Jeu d'échecs pédagogique en français, en un seul fichier HTML (aucune dépend
 
 ## Contenu
 - 9 chapitres × 10 niveaux : Italienne, Noirs, Mats, Tactique, Finales, **Pièges de l'Italienne**, **Les Noirs face à 1.d4 / 1.Cf3**, **Plans du milieu de partie**, **Écarts de l'Italienne**
-- Bot « le Croque-mort » à 5 niveaux de force (Débutant → Expert)
+- Moteur **Stockfish 19** (celui de chess.com) pour la barre d'avantage, les indices, le bot et le bilan ; coups étiquetés comme sur chess.com (Brillant, Très bon coup, Meilleur, Excellent, Bon, Théorie, Imprécision, Erreur, Gaffe)
+- Problème du jour (364 problèmes) avec rattrapage
+- Bot « le Croque-mort » à 5 niveaux (Débutant → Expert), qui n'abandonne jamais : mat ou nulle
 - **Bilan de fin de partie** : revue coup par coup (graphique d'évaluation, classification meilleur / bon / imprécision / erreur / gaffe, coup suggéré, « Analyse plus profonde »)
 - **Révision espacée** des positions ratées (1 / 3 / 7 / 14 / 30 / 60 jours)
 - **Mode Répertoire** : s'entraîner sur ses lignes d'ouverture
@@ -13,7 +15,7 @@ Jeu d'échecs pédagogique en français, en un seul fichier HTML (aucune dépend
 - **PWA** : installable sur téléphone, fonctionne hors ligne
 
 ## Notes
-- Le moteur est écrit en JavaScript (négamax) : l'analyse est indicative, pas du niveau Stockfish.
+- Stockfish tourne dans le navigateur (WebAssembly) ; si le navigateur ne le permet pas, un petit moteur maison prend le relais (moins fort). Les étiquettes sont proches de celles de chess.com sans être identiques à chaque coup.
 - L'import chess.com nécessite une connexion internet.
 - La progression est stockée localement (localStorage) : pensez à l'export.
 
