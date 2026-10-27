@@ -4511,7 +4511,7 @@ function sfStart() {
 function callEngine(cmd, data) {
   if (data && data.old) return callEngineOld(cmd, data);
   if (cmd === 'search' && SF.main && !SF.main.dead) {
-    var d = { fen: data.fen, depth: data.elo ? 12 : 16, ms: data.ms || 1200, elo: data.elo || 0, multipv: data.multipv || 1 };
+    var d = { fen: data.fen, depth: data.sfDepth || (data.elo ? 12 : 16), ms: data.ms || 1200, elo: data.elo || 0, multipv: data.multipv || 1 };
     return sfRun(SF.main, d).then(function (r) { return r || callEngineOld(cmd, data); });
   }
   return callEngineOld(cmd, data);
@@ -4783,7 +4783,7 @@ var REP = {
   'e4 e5 Nc3': 'Nf6', 'e4 e5 Nc3 Nf6 f4': 'd5', 'e4 e5 d4': 'exd4', 'e4 e5 d4 exd4 Qxd4': 'Nc6', 'e4 e5 Bc4': 'Nf6',
   'd4': 'd5', 'd4 d5 c4': 'e6', 'd4 d5 c4 e6 Nc3': 'Nf6', 'd4 d5 c4 e6 Nc3 Nf6 Bg5': 'Be7'
 };
-var LEVELS = { novice: { label: 'Débutant', depth: 1, noise: 400, nodes: 12000, old: true }, easy: { label: 'Facile', depth: 2, noise: 120, nodes: 60000, elo: 1320, ms: 350 }, mid: { label: 'Moyen', depth: 3, noise: 25, nodes: 180000, elo: 1600, ms: 500 }, hard: { label: 'Fort', depth: 4, noise: 0, nodes: 450000, elo: 2000, ms: 800 }, expert: { label: 'Expert', depth: 5, noise: 0, nodes: 1500000, elo: 0, ms: 1500 } };
+var LEVELS = { novice: { label: 'Débutant', depth: 1, noise: 400, nodes: 12000, old: true }, easy: { label: 'Facile', depth: 2, noise: 120, nodes: 60000, h: { d: 2, pv: 8, temp: 220, slip: 0.38, smax: 700, ms: 120 } }, mid: { label: 'Moyen', depth: 3, noise: 25, nodes: 180000, h: { d: 4, pv: 6, temp: 85, slip: 0.12, smax: 450, ms: 200 } }, hard: { label: 'Fort', depth: 4, noise: 0, nodes: 450000, h: { d: 7, pv: 5, temp: 45, slip: 0.08, smax: 300, ms: 400 } }, expert: { label: 'Expert', depth: 5, noise: 0, nodes: 1500000, elo: 0, ms: 1500 } };
 LEVELS = { novice: LEVELS.novice, easy: LEVELS.easy, mid: LEVELS.mid, hard: LEVELS.hard, expert: LEVELS.expert };
 
 function soundButtons() {
@@ -5657,6 +5657,20 @@ function gameUser(r, from, to, promo) {
     botGame(r);
   });
 }
+
+/* bot « humain » : cherche peu profond et choisit parmi les coups avec une part d'erreurs, selon le niveau */
+function humanPick(s, h) {
+  var top = (s.top || []).filter(function (x) { return x.score > -Engine.MATE + 500; });
+  if (!top.length) return s.top && s.top[0];
+  var best = top[0].score;
+  if (Math.random() < h.slip && top.length > 1) {
+    var ok = top.slice(1).filter(function (x) { return best - x.score <= (h.smax || 350); });
+    if (ok.length) return ok[Math.floor(Math.random() * ok.length)];
+  }
+  var w = top.map(function (x) { return Math.exp(-Math.min(600, best - x.score) / h.temp); }), tot = w.reduce(function (a, b) { return a + b; }, 0), u = Math.random() * tot;
+  for (var i = 0; i < top.length; i++) { u -= w[i]; if (u <= 0) return top[i]; }
+  return top[0];
+}
 function botGame(r) {
   if (r.dead || r.over) return;
   var G = r.G; r.lock = true; r.board.setSide(null);
@@ -5666,8 +5680,9 @@ function botGame(r) {
   var legal = G.moves();
   var bookMove = book ? book.filter(function (b) { return legal.indexOf(b) >= 0; }) : [];
   var p = bookMove.length ? Promise.resolve({ san: bookMove[Math.floor(Math.random() * bookMove.length)] }) :
-    callEngine('search', { fen: G.fen(), depth: r.lvl.depth, nodes: r.lvl.nodes, all: r.lvl.noise > 0, elo: r.lvl.elo, ms: r.lvl.ms, old: r.lvl.old }).then(function (s) {
+    callEngine('search', { fen: G.fen(), depth: r.lvl.depth, nodes: r.lvl.nodes, all: r.lvl.noise > 0, elo: r.lvl.elo, ms: (r.lvl.h ? r.lvl.h.ms : r.lvl.ms), multipv: r.lvl.h ? r.lvl.h.pv : 1, sfDepth: r.lvl.h ? r.lvl.h.d : 0, old: r.lvl.old }).then(function (s) {
       if (!s || !s.uci) return null;
+      if (r.lvl.h && s.top && s.top.length > 1) { var hp = humanPick(s, r.lvl.h); if (hp) return { uci: hp.uci, score: s.top[0].score }; }
       var pool = s.top.filter(function (x) { return x.score >= s.top[0].score - r.lvl.noise; });
       var pick = pool[Math.floor(Math.random() * pool.length)] || s.top[0];
       return { uci: pick.uci, score: s.top[0].score };
